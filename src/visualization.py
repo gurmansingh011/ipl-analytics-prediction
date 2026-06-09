@@ -16,6 +16,47 @@ IPL_COLORS = [
 ]
 
 
+LABEL_OVERRIDES = {
+    "display_label": "",
+    "team": "Team",
+    "season": "Season",
+    "type": "Type",
+    "matches": "Matches",
+    "wins": "Wins",
+    "win_percentage": "Win %",
+    "total_runs": "Total Runs",
+    "toss_decision": "Toss Decision",
+    "runs": "Runs",
+    "fours": "Fours",
+    "sixes": "Sixes",
+    "strike_rate": "Strike Rate",
+    "wickets": "Wickets",
+    "economy": "Economy",
+    "dot_ball_percentage": "Dot Ball %",
+    "avg_first_innings_score": "Avg 1st Innings Score",
+    "avg_second_innings_score": "Avg 2nd Innings Score",
+    "highest_score": "Highest Score",
+    "chasing_win_percentage": "Chasing Win %",
+    "model": "Model",
+    "accuracy": "Accuracy",
+}
+
+
+def label_for(name):
+    if not name:
+        return ""
+    return LABEL_OVERRIDES.get(str(name), str(name).replace("_", " ").title())
+
+
+def labels_for(*names):
+    return {name: label_for(name) for name in names if name}
+
+
+def hover_label(name):
+    label = label_for(name)
+    return label if label else "Name"
+
+
 def apply_chart_theme(fig, height=430, showlegend=False, margin=None):
     chart_margin = margin or {"l": 20, "r": 24, "t": 62, "b": 34}
     fig.update_layout(
@@ -59,9 +100,10 @@ def bar_chart(df, x, y, title, color=None, orientation="v", height=430, top_n=No
             color=color,
             orientation="h",
             text=y,
-            hover_data=chart_df.columns,
+            labels=labels_for(x, y, color),
         )
         fig.update_traces(texttemplate="%{x:.3s}", textposition="outside", cliponaxis=False)
+        fig.update_traces(hovertemplate=f"{hover_label(x)}: %{{y}}<br>{hover_label(y)}: %{{x}}<extra></extra>")
         margin = {"l": 150, "r": 52, "t": 62, "b": 34}
     else:
         fig = px.bar(
@@ -72,25 +114,42 @@ def bar_chart(df, x, y, title, color=None, orientation="v", height=430, top_n=No
             color=color,
             orientation="v",
             text=y,
-            hover_data=chart_df.columns,
+            labels=labels_for(x, y, color),
         )
         fig.update_traces(texttemplate="%{y:.3s}", textposition="outside", cliponaxis=False)
+        fig.update_traces(hovertemplate=f"{hover_label(x)}: %{{x}}<br>{hover_label(y)}: %{{y}}<extra></extra>")
         fig.update_xaxes(tickangle=0)
         margin = {"l": 24, "r": 42, "t": 62, "b": 42}
 
     fig.update_layout(barmode="group" if color else "relative")
-    return apply_chart_theme(fig, height=height, showlegend=bool(color and color != x), margin=margin)
+    fig = apply_chart_theme(fig, height=height, showlegend=bool(color and color != x), margin=margin)
+    if orientation == "h":
+        fig.update_xaxes(title_text=label_for(y))
+        fig.update_yaxes(title_text="")
+    else:
+        fig.update_xaxes(title_text=label_for(x))
+        fig.update_yaxes(title_text=label_for(y))
+    return fig
 
 
 def line_chart(df, x, y, title, color=None):
-    fig = px.line(df, x=x, y=y, color=color, markers=True, title=title)
+    fig = px.line(df, x=x, y=y, color=color, markers=True, title=title, labels=labels_for(x, y, color))
     fig.update_traces(line={"width": 3}, marker={"size": 8})
-    return apply_chart_theme(fig, height=420, showlegend=bool(color))
+    fig.update_traces(hovertemplate=f"{hover_label(x)}: %{{x}}<br>{hover_label(y)}: %{{y}}<extra></extra>")
+    fig = apply_chart_theme(fig, height=420, showlegend=bool(color))
+    fig.update_xaxes(title_text=label_for(x))
+    fig.update_yaxes(title_text=label_for(y))
+    return fig
 
 
 def pie_chart(df, names, values, title):
-    fig = px.pie(df, names=names, values=values, title=title, hole=0.48, color_discrete_sequence=IPL_COLORS)
-    fig.update_traces(textposition="inside", textinfo="percent+label", marker={"line": {"color": "#07143d", "width": 2}})
+    fig = px.pie(df, names=names, values=values, title=title, hole=0.48, color_discrete_sequence=IPL_COLORS, labels=labels_for(names, values))
+    fig.update_traces(
+        textposition="inside",
+        textinfo="percent+label",
+        marker={"line": {"color": "#07143d", "width": 2}},
+        hovertemplate=f"{hover_label(names)}: %{{label}}<br>{hover_label(values)}: %{{value}}<br>Share: %{{percent}}<extra></extra>",
+    )
     return apply_chart_theme(fig, height=420, showlegend=False)
 
 
