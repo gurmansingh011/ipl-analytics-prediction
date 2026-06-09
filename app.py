@@ -24,6 +24,47 @@ MODEL_PATH = BASE_DIR / "models" / "match_predictor.pkl"
 st.set_page_config(page_title="IPL Analytics & Prediction", layout="wide")
 
 
+LABEL_OVERRIDES = {
+    "display_label": "",
+    "team": "Team",
+    "season": "Season",
+    "type": "Type",
+    "matches": "Matches",
+    "wins": "Wins",
+    "win_percentage": "Win %",
+    "total_runs": "Total Runs",
+    "toss_decision": "Toss Decision",
+    "runs": "Runs",
+    "fours": "Fours",
+    "sixes": "Sixes",
+    "strike_rate": "Strike Rate",
+    "wickets": "Wickets",
+    "economy": "Economy",
+    "dot_ball_percentage": "Dot Ball %",
+    "avg_first_innings_score": "Avg 1st Innings Score",
+    "avg_second_innings_score": "Avg 2nd Innings Score",
+    "highest_score": "Highest Score",
+    "chasing_win_percentage": "Chasing Win %",
+    "model": "Model",
+    "accuracy": "Accuracy",
+}
+
+
+def label_for(name: str | None) -> str:
+    if not name:
+        return ""
+    return LABEL_OVERRIDES.get(str(name), str(name).replace("_", " ").title())
+
+
+def labels_for(*names: str) -> dict[str, str]:
+    return {name: label_for(name) for name in names if name}
+
+
+def hover_label(name: str | None) -> str:
+    label = label_for(name)
+    return label if label else "Name"
+
+
 def bar_chart(df, x, y, title, color=None, orientation="v", height=430, top_n=None, sort_ascending=False):
     """Local themed bar chart wrapper to avoid stale helper imports in Streamlit sessions."""
     chart_df = df.copy()
@@ -41,10 +82,11 @@ def bar_chart(df, x, y, title, color=None, orientation="v", height=430, top_n=No
             color=color,
             orientation="h",
             text=y,
-            hover_data=chart_df.columns,
             color_discrete_sequence=colorway,
+            labels=labels_for(x, y, color),
         )
         fig.update_traces(texttemplate="%{x:.3s}", textposition="outside", cliponaxis=False)
+        fig.update_traces(hovertemplate=f"{hover_label(x)}: %{{y}}<br>{hover_label(y)}: %{{x}}<extra></extra>")
         margin = {"l": 150, "r": 52, "t": 62, "b": 34}
     else:
         fig = px.bar(
@@ -54,10 +96,11 @@ def bar_chart(df, x, y, title, color=None, orientation="v", height=430, top_n=No
             title=title,
             color=color,
             text=y,
-            hover_data=chart_df.columns,
             color_discrete_sequence=colorway,
+            labels=labels_for(x, y, color),
         )
         fig.update_traces(texttemplate="%{y:.3s}", textposition="outside", cliponaxis=False)
+        fig.update_traces(hovertemplate=f"{hover_label(x)}: %{{x}}<br>{hover_label(y)}: %{{y}}<extra></extra>")
         fig.update_xaxes(tickangle=0)
         margin = {"l": 24, "r": 42, "t": 62, "b": 42}
 
@@ -71,15 +114,20 @@ def bar_chart(df, x, y, title, color=None, orientation="v", height=430, top_n=No
         height=height,
         showlegend=bool(color and color != x),
     )
-    fig.update_xaxes(gridcolor="rgba(255,255,255,0.10)", tickfont={"color": "#c7d6f7", "size": 11})
-    fig.update_yaxes(gridcolor="rgba(255,255,255,0.08)", tickfont={"color": "#c7d6f7", "size": 11})
+    if orientation == "h":
+        fig.update_xaxes(title_text=label_for(y), gridcolor="rgba(255,255,255,0.10)", tickfont={"color": "#c7d6f7", "size": 11})
+        fig.update_yaxes(title_text="", gridcolor="rgba(255,255,255,0.08)", tickfont={"color": "#c7d6f7", "size": 11})
+    else:
+        fig.update_xaxes(title_text=label_for(x), gridcolor="rgba(255,255,255,0.10)", tickfont={"color": "#c7d6f7", "size": 11})
+        fig.update_yaxes(title_text=label_for(y), gridcolor="rgba(255,255,255,0.08)", tickfont={"color": "#c7d6f7", "size": 11})
     return fig
 
 
 def line_chart(df, x, y, title, color=None):
     colorway = ["#18c8ff", "#f7c948", "#e6408a", "#31d0aa", "#7c5cff", "#ff8a3d", "#4ea1ff", "#f95f62"]
-    fig = px.line(df, x=x, y=y, color=color, markers=True, title=title, color_discrete_sequence=colorway)
+    fig = px.line(df, x=x, y=y, color=color, markers=True, title=title, color_discrete_sequence=colorway, labels=labels_for(x, y, color))
     fig.update_traces(line={"width": 3}, marker={"size": 8})
+    fig.update_traces(hovertemplate=f"{hover_label(x)}: %{{x}}<br>{hover_label(y)}: %{{y}}<extra></extra>")
     fig.update_layout(
         template="plotly_dark",
         paper_bgcolor="rgba(0,0,0,0)",
@@ -90,19 +138,20 @@ def line_chart(df, x, y, title, color=None):
         height=420,
         showlegend=bool(color),
     )
-    fig.update_xaxes(gridcolor="rgba(255,255,255,0.10)", tickfont={"color": "#c7d6f7", "size": 11})
-    fig.update_yaxes(gridcolor="rgba(255,255,255,0.08)", tickfont={"color": "#c7d6f7", "size": 11})
+    fig.update_xaxes(title_text=label_for(x), gridcolor="rgba(255,255,255,0.10)", tickfont={"color": "#c7d6f7", "size": 11})
+    fig.update_yaxes(title_text=label_for(y), gridcolor="rgba(255,255,255,0.08)", tickfont={"color": "#c7d6f7", "size": 11})
     return fig
 
 
 def pie_chart(df, names, values, title):
     colorway = ["#18c8ff", "#f7c948", "#e6408a", "#31d0aa", "#7c5cff", "#ff8a3d", "#4ea1ff", "#f95f62"]
-    fig = px.pie(df, names=names, values=values, title=title, hole=0.48, color_discrete_sequence=colorway)
+    fig = px.pie(df, names=names, values=values, title=title, hole=0.48, color_discrete_sequence=colorway, labels=labels_for(names, values))
     fig.update_traces(
         textposition="inside",
         textinfo="percent+label",
         marker={"line": {"color": "#07143d", "width": 2}},
         textfont={"color": "#ffffff", "size": 13},
+        hovertemplate=f"{hover_label(names)}: %{{label}}<br>{hover_label(values)}: %{{value}}<br>Share: %{{percent}}<extra></extra>",
     )
     fig.update_layout(
         template="plotly_dark",
